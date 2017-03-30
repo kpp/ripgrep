@@ -731,8 +731,10 @@ impl<'a> ArgMatches<'a> {
         let mut specs = vec![
             "path:fg:magenta".parse().unwrap(),
             "line:fg:green".parse().unwrap(),
+            "column:fg:yellow".parse().unwrap(),
             "match:fg:red".parse().unwrap(),
             "match:style:bold".parse().unwrap(),
+            "separator:fg:cyan".parse().unwrap(),
         ];
         for spec_str in self.values_of_lossy_vec("colors") {
             specs.push(try!(spec_str.parse()));

@@ -361,7 +361,7 @@ impl<W: WriteColor> Printer<W> {
     }
 
     fn separator(&mut self, sep: &[u8]) {
-        self.write(&sep);
+        self.write_colored(&sep, |colors| colors.separator());
     }
 
     fn write_path_sep(&mut self, sep: u8) {
@@ -415,7 +415,7 @@ impl<W: WriteColor> Printer<W> {
     }
 
     fn column_number(&mut self, n: u64, sep: u8) {
-        self.write(n.to_string().as_bytes());
+        self.write_colored(n.to_string().as_bytes(), |colors| colors.column());
         self.separator(&[sep]);
     }
 
@@ -482,7 +482,7 @@ impl fmt::Display for Error {
         match *self {
             Error::UnrecognizedOutType(ref name) => {
                 write!(f, "Unrecognized output type '{}'. Choose from: \
-                           path, line, match.", name)
+                           path, line, column, match, separator.", name)
             }
             Error::UnrecognizedSpecType(ref name) => {
                 write!(f, "Unrecognized spec type '{}'. Choose from: \
@@ -497,7 +497,7 @@ impl fmt::Display for Error {
             }
             Error::InvalidFormat(ref original) => {
                 write!(f, "Invalid color speci format: '{}'. Valid format \
-                           is '(path|line|match):(fg|bg|style):(value)'.",
+                           is '(path|line|column|match|separator):(fg|bg|style):(value)'.",
                            original)
             }
         }
@@ -515,7 +515,9 @@ impl From<ParseColorError> for Error {
 pub struct ColorSpecs {
     path: ColorSpec,
     line: ColorSpec,
+    column: ColorSpec,
     matched: ColorSpec,
+    separator: ColorSpec,
 }
 
 /// A single color specification provided by the user.
@@ -583,7 +585,9 @@ enum SpecValue {
 enum OutType {
     Path,
     Line,
+    Column,
     Match,
+    Separator,
 }
 
 /// The specification type.
@@ -613,7 +617,9 @@ impl ColorSpecs {
             match user_spec.ty {
                 OutType::Path => user_spec.merge_into(&mut specs.path),
                 OutType::Line => user_spec.merge_into(&mut specs.line),
+                OutType::Column => user_spec.merge_into(&mut specs.column),
                 OutType::Match => user_spec.merge_into(&mut specs.matched),
+                OutType::Separator => user_spec.merge_into(&mut specs.separator),
             }
         }
         specs
@@ -629,9 +635,19 @@ impl ColorSpecs {
         &self.line
     }
 
+    /// Return the color specification for coloring column numbers.
+    fn column(&self) -> &ColorSpec {
+        &self.column
+    }
+
     /// Return the color specification for coloring matched text.
     fn matched(&self) -> &ColorSpec {
         &self.matched
+    }
+
+    /// Return the color specification for coloring separators.
+    fn separator(&self) -> &ColorSpec {
+        &self.separator
     }
 }
 
@@ -704,7 +720,9 @@ impl FromStr for OutType {
         match &*s.to_lowercase() {
             "path" => Ok(OutType::Path),
             "line" => Ok(OutType::Line),
+            "column" => Ok(OutType::Column),
             "match" => Ok(OutType::Match),
+            "separator" => Ok(OutType::Separator),
             _ => Err(Error::UnrecognizedOutType(s.to_string())),
         }
     }
@@ -755,6 +773,8 @@ mod tests {
         assert_eq!(ColorSpecs::new(user_specs), ColorSpecs {
             path: ColorSpec::default(),
             line: ColorSpec::default(),
+            column: ColorSpec::default(),
+            separator: ColorSpec::default(),
             matched: expect_matched,
         });
     }
@@ -789,6 +809,18 @@ mod tests {
         assert_eq!(spec, Spec {
             ty: OutType::Line,
             value: SpecValue::None,
+        });
+
+        let spec: Spec = "column:fg:white".parse().unwrap();
+        assert_eq!(spec, Spec {
+            ty: OutType::Column,
+            value: SpecValue::Fg(Color::White),
+        });
+
+        let spec: Spec = "separator:bg:black".parse().unwrap();
+        assert_eq!(spec, Spec {
+            ty: OutType::Separator,
+            value: SpecValue::Bg(Color::Black),
         });
     }
 
